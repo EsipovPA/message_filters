@@ -2,8 +2,8 @@
 Changelog for package message_filters
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+7.0.0 (2024-12-20)
+------------------
 * Add temporal offset between topics between ApproximateTimeSynchronizer (`#154 <https://github.com/ros2/message_filters/issues/154>`_)
 * Remove CODEOWNERS and mirror-rolling-to-master workflow. (`#158 <https://github.com/ros2/message_filters/issues/158>`_)
 * Contributors: Chris Lalancette, Clément Chupin
