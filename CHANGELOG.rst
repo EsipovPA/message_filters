@@ -2,8 +2,8 @@
 Changelog for package message_filters
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+4.11.5 (2025-04-02)
+-------------------
 * fix: add `rclcpp::shutdown` (`#167 <https://github.com/ros2/message_filters/issues/167>`_) (`#168 <https://github.com/ros2/message_filters/issues/168>`_)
   (cherry picked from commit dfe5dde18465bac2fdf9e485c1df84bbf2f46332)
   Co-authored-by: Yuyuan Yuan <az6980522@gmail.com>
