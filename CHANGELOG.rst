@@ -2,6 +2,11 @@
 Changelog for package message_filters
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+7.2.0 (2025-04-25)
+------------------
+* Docs - Remove C++ implementation limit of 9 channels (`#174 <https://github.com/ros2/message_filters/issues/174>`_)
+* Contributors: Patrick Roncagliolo
+
 7.1.0 (2025-04-08)
 ------------------
 * Removed windows warnings (`#171 <https://github.com/ros2/message_filters/issues/171>`_)
