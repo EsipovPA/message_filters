@@ -2,8 +2,8 @@
 Changelog for package message_filters
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+7.2.2 (2025-07-01)
+------------------
 * Fix cache tutorial: added tab extension (`#190 <https://github.com/ros2/message_filters/issues/190>`_)
 * Add tutorial for Cache filter for Python (`#185 <https://github.com/ros2/message_filters/issues/185>`_)
 * Contributors: Alejandro Hernández Cordero, Pavel Esipov
