@@ -2,8 +2,8 @@
 Changelog for package message_filters
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+7.3.0 (2025-07-29)
+------------------
 * Add 'Cache (C++)' tutorial (`#196 <https://github.com/ros2/message_filters/issues/196>`_)
 * cache.hpp: Add allow_headerless (`#195 <https://github.com/ros2/message_filters/issues/195>`_)
 * Simplify method call (`#194 <https://github.com/ros2/message_filters/issues/194>`_)
