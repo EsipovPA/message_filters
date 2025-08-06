@@ -2,8 +2,8 @@
 Changelog for package message_filters
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+4.11.7 (2025-08-06)
+-------------------
 * Add 'Cache (C++)' tutorial (`#196 <https://github.com/ros2/message_filters/issues/196>`_) (`#198 <https://github.com/ros2/message_filters/issues/198>`_)
   (cherry picked from commit c7821ef2dcfdd6161983b0fe52829b9067a5e076)
   Co-authored-by: Pavel Esipov <38457822+EsipovPA@users.noreply.github.com>
