@@ -11,6 +11,7 @@ We will use ``std_msgs.msg.String`` message for clarity and simplicity.
 
 Prerequisites
 ~~~~~~~~~~~~~
+
 This tutorial assumes you have a working knowledge of ROS 2.
 
 If you have not done so already `create a workspace <https://docs.ros.org/en/rolling/Tutorials/Beginner-Client-Libraries/Creating-A-Workspace/Creating-A-Workspace.html>`_ and `create a package <https://docs.ros.org/en/rolling/Tutorials/Beginner-Client-Libraries/Creating-Your-First-ROS2-Package.html>`_
