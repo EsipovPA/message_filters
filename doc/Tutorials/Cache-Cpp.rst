@@ -334,7 +334,7 @@ Now run the node using:
 
 .. code-block:: console
 
-    ros2 run pkg_name cache_tutorial
+    ros2 run cache_tutorial cache_tutorial
 
 The first message in the output is going to be
 
