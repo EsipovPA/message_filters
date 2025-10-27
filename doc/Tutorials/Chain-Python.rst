@@ -24,7 +24,7 @@ If you have not done so already `create a workspace <https://docs.ros.org/en/rol
 1. Create a Basic Node
 ~~~~~~~~~~~~~~~~~~~~~~
 
-Let's assume, you've already created an empty ROS package for Python.
+Let's assume, you've already created an empty ROS 2 package for Python.
 The next step is to create a new Python file inside your package, e.g., ``chain_tutorial.py``, and write an example code:
 
 .. code-block:: python
