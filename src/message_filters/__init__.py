@@ -83,8 +83,7 @@ class Subscriber(SimpleFilter):
         node: Node,
         msg_type: Type[MsgT],
         topic: str,
-        qos_profile: Union[QoSProfile, int] = 10,
-        **kwargs,
+        qos_profile: Union[QoSProfile, int] = QoSProfile(depth=10),
     ) -> None:
         """
         Construct a Subscriber.
@@ -101,7 +100,10 @@ class Subscriber(SimpleFilter):
         self.node = node
         self.topic = topic
         self.sub = self.node.create_subscription(
-            msg_type, topic, self.callback, qos_profile, **kwargs
+            msg_type=msg_type,
+            topic=self.topic,
+            callback=self.callback,
+            qos_profile=qos_profile,
         )
 
     def callback(self, msg):
