@@ -76,12 +76,43 @@ class Subscriber(SimpleFilter):
     from a ROS2 subscription through to the filters which have connected
     to it.
     """
+<<<<<<< HEAD
     def __init__(self, *args, **kwargs):
         SimpleFilter.__init__(self)
         self.node = args[0]
         self.topic = args[2]
         kwargs.setdefault('qos_profile', 10)
         self.sub = self.node.create_subscription(*args[1:], self.callback, **kwargs)
+=======
+
+    def __init__(
+        self,
+        node: Node,
+        msg_type: Type[MsgT],
+        topic: str,
+        qos_profile: Union[QoSProfile, int] = QoSProfile(depth=10),
+    ) -> None:
+        """
+        Construct a Subscriber.
+
+        :param node: The node to create a subscriber for.
+        :param msg_type: The type of ROS messages the subscription will subscribe to.
+        :param topic: The name of the topic the subscription will subscribe to.
+        :param qos_profile: A QoSProfile or a history depth to apply to the
+            subscription. In the case that a history depth is provided, the QoS history is
+            set to KEEP_LAST, the QoS history depth is set to the value of the parameter,
+            and all other QoS settings are set to their default values.
+        """
+        SimpleFilter.__init__(self)
+        self.node = node
+        self.topic = topic
+        self.sub = self.node.create_subscription(
+            msg_type=msg_type,
+            topic=self.topic,
+            callback=self.callback,
+            qos_profile=qos_profile,
+        )
+>>>>>>> c31a7a9 (Add simple filter tutorials (#226))
 
     def callback(self, msg):
         self.signalMessage(msg)
