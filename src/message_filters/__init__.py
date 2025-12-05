@@ -39,11 +39,16 @@ import itertools
 import threading
 import rclpy
 
+from typing import Type, Union
+
 import builtin_interfaces
 from rclpy.clock import ROSClock
 from rclpy.duration import Duration
 from rclpy.logging import LoggingSeverity
+from rclpty.node import Node
+from rclpy.qos import QoSProfile
 from rclpy.time import Time
+from rclpy.type_support import MsgT
 
 
 class SimpleFilter(object):
@@ -76,14 +81,6 @@ class Subscriber(SimpleFilter):
     from a ROS2 subscription through to the filters which have connected
     to it.
     """
-<<<<<<< HEAD
-    def __init__(self, *args, **kwargs):
-        SimpleFilter.__init__(self)
-        self.node = args[0]
-        self.topic = args[2]
-        kwargs.setdefault('qos_profile', 10)
-        self.sub = self.node.create_subscription(*args[1:], self.callback, **kwargs)
-=======
 
     def __init__(
         self,
@@ -104,6 +101,12 @@ class Subscriber(SimpleFilter):
             and all other QoS settings are set to their default values.
         """
         SimpleFilter.__init__(self)
+    def __init__(self, *args, **kwargs):
+        SimpleFilter.__init__(self)
+        self.node = args[0]
+        self.topic = args[2]
+        kwargs.setdefault('qos_profile', 10)
+        self.sub = self.node.create_subscription(*args[1:], self.callback, **kwargs)
         self.node = node
         self.topic = topic
         self.sub = self.node.create_subscription(
@@ -112,7 +115,6 @@ class Subscriber(SimpleFilter):
             callback=self.callback,
             qos_profile=qos_profile,
         )
->>>>>>> c31a7a9 (Add simple filter tutorials (#226))
 
     def callback(self, msg):
         self.signalMessage(msg)
