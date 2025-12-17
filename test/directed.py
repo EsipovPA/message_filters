@@ -41,6 +41,7 @@
 #
 #    wide.registerCallback(boost::bind(&PersonDataRecorder::wideCB, this, _1, _2, _3, _4));
 
+import functools
 import random
 import unittest
 
@@ -66,6 +67,7 @@ class MockFilter(SimpleFilter):
 
 class TestDirected(unittest.TestCase):
 
+    # TODO: Replace global variable with local
     def cb_collector_2msg(self, msg1, msg2):
         self.collector.append((msg1, msg2))
 
@@ -105,8 +107,88 @@ class TestDirected(unittest.TestCase):
                 m1.signalMessage(msg)
             self.assertEqual(set(self.collector), set(zip(seq0, seq1)))
 
+    def test_time_synchronizer_shifted_time_signalling_1(self):
+        def collector_callback(msg1, msg2, collector):
+            collector.append((msg1, msg2))
+
+        collector = []
+
+        filter_0 = MockFilter()
+        filter_1 = MockFilter()
+        ts = TimeSynchronizer([filter_0, filter_1], 10)
+        ts.registerCallback(
+            functools.partial(
+                collector_callback,
+                collector=collector,
+            )
+        )
+
+        t1 = 0
+        t2 = 1
+
+        x0 = MockMessage(t1, 1)
+        x1 = MockMessage(t1, 2)
+
+        y0 = MockMessage(t2, 1)
+        y1 = MockMessage(t2, 2)
+
+        filter_0.signalMessage(x0)
+        assert len(collector) == 0
+
+        filter_1.signalMessage(y1)
+        assert len(collector) == 0
+
+        filter_0.signalMessage(y0)
+        assert len(collector) == 1
+        assert collector[0] == (y0, y1)
+
+        filter_1.signalMessage(x1)
+        assert len(collector) == 1
+        assert collector[0] == (y0, y1)
+
+    def test_time_synchronizer_shifted_time_signalling_2(self):
+        def collector_callback(msg1, msg2, collector):
+            collector.append((msg1, msg2))
+
+        collector = []
+
+        filter_0 = MockFilter()
+        filter_1 = MockFilter()
+        ts = TimeSynchronizer([filter_0, filter_1], 10)
+        ts.registerCallback(
+            functools.partial(
+                collector_callback,
+                collector=collector,
+            )
+        )
+
+        t1 = 0
+        t2 = 1
+
+        x0 = MockMessage(t1, 1)
+        x1 = MockMessage(t1, 2)
+
+        y0 = MockMessage(t2, 1)
+        y1 = MockMessage(t2, 2)
+
+        filter_0.signalMessage(x0)
+        assert len(collector) == 0
+
+        filter_0.signalMessage(y0)
+        assert len(collector) == 0
+
+        filter_1.signalMessage(x1)
+        assert len(collector) == 1
+        assert collector[0] == (x0, x1)
+
+        filter_1.signalMessage(y1)
+        assert len(collector) == 2
+        assert collector[0] == (x0, x1)
+        assert collector[1] == (y0, y1)
+
 
 if __name__ == '__main__':
     suite = unittest.TestSuite()
     suite.addTest(TestDirected('test_synchronizer'))
+    suite.addTest(TestDirected('test_time_synchronizer_old_msgs_drop'))
     unittest.TextTestRunner(verbosity=2).run(suite)
