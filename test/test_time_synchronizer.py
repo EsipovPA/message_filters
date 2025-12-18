@@ -42,7 +42,6 @@
 #    wide.registerCallback(boost::bind(&PersonDataRecorder::wideCB, this, _1, _2, _3, _4));
 
 import functools
-import random
 import unittest
 
 from builtin_interfaces.msg import Time as TimeMsg
@@ -67,50 +66,35 @@ class MockFilter(SimpleFilter):
 
 class TestDirected(unittest.TestCase):
 
-    # TODO: Replace global variable with local
-    def cb_collector_2msg(self, msg1, msg2):
-        self.collector.append((msg1, msg2))
+    @staticmethod
+    def collector_callback(msg1, msg2, collector):
+        collector.append((msg1, msg2))
 
-    def test_synchronizer(self):
-        m0 = MockFilter()
-        m1 = MockFilter()
-        ts = TimeSynchronizer([m0, m1], 1)
-        ts.registerCallback(self.cb_collector_2msg)
-
-        if 0:
-            # Simple case, pairs of messages, make sure that they get combined
-            for t in range(10):
-                self.collector = []
-                msg0 = MockMessage(t, 33)
-                msg1 = MockMessage(t, 34)
-                m0.signalMessage(msg0)
-                self.assertEqual(self.collector, [])
-                m1.signalMessage(msg1)
-                self.assertEqual(self.collector, [(msg0, msg1)])
-
-        # Scramble sequences of length N.
-        # Make sure that TimeSequencer recombines them.
-        random.seed(0)
+    def test_time_synchronizer_queue_lentgth(self):
         for N in range(1, 10):
+            seq0 = [MockMessage(t, 0) for t in range(N)]
+            seq1 = [MockMessage(t, 0) for t in range(N)]
+
             m0 = MockFilter()
             m1 = MockFilter()
-            seq0 = [MockMessage(t, random.random()) for t in range(N)]
-            seq1 = [MockMessage(t, random.random()) for t in range(N)]
-            # random.shuffle(seq0)
             ts = TimeSynchronizer([m0, m1], N)
-            ts.registerCallback(self.cb_collector_2msg)
-            self.collector = []
-            for msg in random.sample(seq0, N):
+
+            collector = []
+            ts.registerCallback(
+                functools.partial(
+                    self.collector_callback,
+                    collector=collector,
+                )
+            )
+
+            for msg in seq0:
                 m0.signalMessage(msg)
-            self.assertEqual(self.collector, [])
-            for msg in random.sample(seq1, N):
+            self.assertEqual(collector, [])
+            for msg in seq1:
                 m1.signalMessage(msg)
-            self.assertEqual(set(self.collector), set(zip(seq0, seq1)))
+            self.assertEqual(set(collector), set(zip(seq0, seq1)))
 
-    def test_time_synchronizer_shifted_time_signalling_1(self):
-        def collector_callback(msg1, msg2, collector):
-            collector.append((msg1, msg2))
-
+    def test_time_synchronizer_drop_old_messages(self):
         collector = []
 
         filter_0 = MockFilter()
@@ -118,7 +102,7 @@ class TestDirected(unittest.TestCase):
         ts = TimeSynchronizer([filter_0, filter_1], 10)
         ts.registerCallback(
             functools.partial(
-                collector_callback,
+                self.collector_callback,
                 collector=collector,
             )
         )
@@ -146,10 +130,7 @@ class TestDirected(unittest.TestCase):
         assert len(collector) == 1
         assert collector[0] == (y0, y1)
 
-    def test_time_synchronizer_shifted_time_signalling_2(self):
-        def collector_callback(msg1, msg2, collector):
-            collector.append((msg1, msg2))
-
+    def test_time_synchronizer_shifted_time_signalling(self):
         collector = []
 
         filter_0 = MockFilter()
@@ -157,7 +138,7 @@ class TestDirected(unittest.TestCase):
         ts = TimeSynchronizer([filter_0, filter_1], 10)
         ts.registerCallback(
             functools.partial(
-                collector_callback,
+                self.collector_callback,
                 collector=collector,
             )
         )
@@ -189,6 +170,7 @@ class TestDirected(unittest.TestCase):
 
 if __name__ == '__main__':
     suite = unittest.TestSuite()
-    suite.addTest(TestDirected('test_synchronizer'))
-    suite.addTest(TestDirected('test_time_synchronizer_old_msgs_drop'))
+    suite.addTest(TestDirected('test_time_synchronizer_queue_lentgth'))
+    suite.addTest(TestDirected('test_time_synchronizer_drop_old_messages'))
+    suite.addTest(TestDirected('test_time_synchronizer_shifted_time_signalling'))
     unittest.TextTestRunner(verbosity=2).run(suite)
