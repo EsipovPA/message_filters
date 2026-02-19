@@ -2,8 +2,8 @@
 Changelog for package message_filters
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+4.3.14 (2026-02-18)
+-------------------
 * `#253 <https://github.com/ros2/message_filters/issues/253>`_ message_filters.chain.python: Remove dataclass. Make FilterInfo a regular class with regular __init_\_ (`#254 <https://github.com/ros2/message_filters/issues/254>`_)
 * Contributors: Pavel Esipov
 
