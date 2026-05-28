@@ -492,8 +492,8 @@ has not yet been routed through the filter chain by the time the query callback 
 the very first line reports ``0``.
 From the second tick onward the prior message has been delivered, so the count advances as expected.
 
-6. Other options provided by the DeltaFilter package
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+6. Other options provided by the DeltaFilter class                                                                                                                          
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If you want different comparison semantics than "any field differs", you can plug a custom comparison handler into ``ComparisonFilter``.
 The recommended path is to inherit from ``CachedComparisonHandler`` — it already implements the per-field caching and iteration logic in ``message_fits``, and exposes the actual comparison as a pure-virtual hook.
