@@ -60,7 +60,8 @@ namespace message_filters
 void callback(const std::shared_ptr<M const> &);
 \endverbatim
  */
-template<class M>
+template<class M,
+  template<typename GetterMessageType> typename TimeGetter = message_traits::TimeGetterBase>
 class Cache : public SimpleFilter<M>
 {
 public:
@@ -345,7 +346,8 @@ private:
 
   static rclcpp::Time getMessageTimeFromHeader(const EventType & evt)
   {
-    return message_filters::message_traits::TimeStamp<M>::value(*(evt.getMessage()));
+    return message_filters::message_traits::TimeStampCustom<M,
+             TimeGetter>::value(*(evt.getMessage()));
   }
 
   static rclcpp::Time getMessageReceiveTime(const EventType & evt)

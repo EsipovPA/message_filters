@@ -48,10 +48,10 @@ namespace message_filters
 namespace sync_policies
 {
 
-template<typename ... Ms>
-struct ExactTime : public PolicyBase<Ms...>
+template<template<typename GetterMessageType> typename TimeGetter, typename ... Ms>
+struct ExactTimeBase : public PolicyBase<Ms...>
 {
-  using Sync = Synchronizer<ExactTime>;
+  using Sync = Synchronizer<ExactTimeBase>;
   using Super = PolicyBase<Ms...>;
   using Messages = typename Super::Messages;
   using Signal = typename Super::Signal;
@@ -59,18 +59,18 @@ struct ExactTime : public PolicyBase<Ms...>
   using RealTypeCount = typename Super::RealTypeCount;
   using Tuple = Events;
 
-  ExactTime(uint32_t queue_size)  // NOLINT(runtime/explicit)
+  ExactTimeBase(uint32_t queue_size)  // NOLINT(runtime/explicit)
   : parent_(0)
     , queue_size_(queue_size)
   {
   }
 
-  ExactTime(const ExactTime & e)
+  ExactTimeBase(const ExactTimeBase & e)
   {
     *this = e;
   }
 
-  ExactTime & operator=(const ExactTime & rhs)
+  ExactTimeBase & operator=(const ExactTimeBase & rhs)
   {
     parent_ = rhs.parent_;
     queue_size_ = rhs.queue_size_;
@@ -95,7 +95,7 @@ struct ExactTime : public PolicyBase<Ms...>
 
     std::lock_guard<std::mutex> lock(mutex_);
 
-    Tuple & t = tuples_[mt::TimeStamp<Message>::value(*evt.getMessage())];
+    Tuple & t = tuples_[mt::TimeStampCustom<Message, TimeGetter>::value(*evt.getMessage())];
     std::get<i>(t) = evt;
 
     checkTuple(t);
@@ -146,7 +146,7 @@ private:
       std::apply([this](auto &&... args) {this->parent_->signal(args ...);}, t);
 
       using M0 = std::tuple_element_t<0, std::tuple<Ms...>>;
-      last_signal_time_ = mt::TimeStamp<M0>::value(*std::get<0>(t).getMessage());
+      last_signal_time_ = mt::TimeStampCustom<M0, TimeGetter>::value(*std::get<0>(t).getMessage());
 
       tuples_.erase(last_signal_time_);
 
@@ -192,6 +192,30 @@ private:
   Signal drop_signal_;
 
   std::mutex mutex_;
+};
+
+template<typename ... Ms>
+struct ExactTime : public ExactTimeBase<message_traits::TimeGetterBase, Ms...>
+{
+  typedef ExactTimeBase<message_filters::message_traits::TimeGetterBase, Ms...> Parent;
+
+  ExactTime(uint32_t queue_size)    // NOLINT(runtime/explicit)
+  : ExactTimeBase<message_traits::TimeGetterBase, Ms...>(queue_size)
+  {}
+
+  ExactTime(const ExactTime & e)
+  : Parent(e)
+  {}
+
+  ExactTime & operator=(const ExactTime & rhs)
+  {
+    return Parent::operator=(rhs);
+  }
+
+  void initParent(void * parent)
+  {
+    Parent::initParent(static_cast<Parent::Sync *>(parent));
+  }
 };
 
 }  // namespace sync_policies

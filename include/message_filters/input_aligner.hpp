@@ -75,8 +75,8 @@ namespace message_filters
  * This implementation was inspired by ROCK's stream aligner.
  * https://www.rock-robotics.org/documentation/data_processing/stream_aligner.html
  */
-template<typename ... Ms>
-class InputAligner : public noncopyable
+template<template<typename GetterMessageType> typename TimeGetter, typename ... Ms>
+class InputAlignerBase : public noncopyable
 {
 public:
   static constexpr std::size_t N_INPUTS = sizeof...(Ms);
@@ -96,7 +96,7 @@ public:
   };
 
   template<class F0, class F1, class ... Fs>
-  InputAligner(const rclcpp::Duration & timeout, F0 & f0, F1 & f1, Fs &... fs)
+  InputAlignerBase(const rclcpp::Duration & timeout, F0 & f0, F1 & f1, Fs &... fs)
   : timeout_(timeout)
     , last_in_ts_(0, 0, RCL_ROS_TIME)
     , last_out_ts_(0, 0, RCL_ROS_TIME)
@@ -104,14 +104,14 @@ public:
     connectInput(f0, f1, fs ...);
   }
 
-  explicit InputAligner(const rclcpp::Duration & timeout)
+  explicit InputAlignerBase(const rclcpp::Duration & timeout)
   : timeout_(timeout)
     , last_in_ts_(0, 0, RCL_ROS_TIME)
     , last_out_ts_(0, 0, RCL_ROS_TIME)
   {
   }
 
-  virtual ~InputAligner()
+  virtual ~InputAlignerBase()
   {
     disconnectAll();
   }
@@ -246,8 +246,10 @@ protected:
     bool operator()(
       const MessageEvent<MsgType const> & lhs, const MessageEvent<MsgType const> & rhs) const
     {
-      return message_filters::message_traits::TimeStamp<MsgType>::value(*lhs.getConstMessage()) <
-             message_filters::message_traits::TimeStamp<MsgType>::value(*rhs.getConstMessage());
+      return message_filters::message_traits::TimeStampCustom<MsgType,
+               TimeGetter>::value(*lhs.getConstMessage()) <
+             message_filters::message_traits::TimeStampCustom<MsgType,
+               TimeGetter>::value(*rhs.getConstMessage());
     }
   };
 
@@ -265,7 +267,7 @@ public:
     {
       if (!this->empty()) {
         rclcpp::Time first_ts =
-          message_filters::message_traits::TimeStamp<MsgType>::value(
+          message_filters::message_traits::TimeStampCustom<MsgType, TimeGetter>::value(
             *(this->begin()->getConstMessage()));
         next_ts_ = first_ts + period_;
         active_ = true;
@@ -346,7 +348,8 @@ protected:
     using Message = typename std::tuple_element_t<I, Messages>;
 
     rclcpp::Time msg_timestamp =
-      message_filters::message_traits::TimeStamp<Message>::value(*evt.getConstMessage());
+      message_filters::message_traits::TimeStampCustom<Message,
+        TimeGetter>::value(*evt.getConstMessage());
 
     std::lock_guard<std::mutex> lock(mutex_);
     auto & event_queue = std::get<I>(event_queues_);
@@ -403,7 +406,8 @@ protected:
         // dispatch first event
         const MEvent & evt = *event_queue.begin();
         last_out_ts_ =
-          message_filters::message_traits::TimeStamp<Message>::value(*evt.getConstMessage());
+          message_filters::message_traits::TimeStampCustom<Message,
+            TimeGetter>::value(*evt.getConstMessage());
         std::get<I>(signals_).call(evt);
         event_queue.popFirst();
         return true;
@@ -434,6 +438,22 @@ protected:
   std::string name_;
   std::mutex mutex_;
   rclcpp::TimerBase::SharedPtr dispatch_timer_;
+};
+
+template<typename ... Ms>
+class InputAligner : public InputAlignerBase<message_traits::TimeGetterBase, Ms...>
+{
+public:
+  typedef InputAlignerBase<message_filters::message_traits::TimeGetterBase, Ms...> Parent;
+
+  template<class F0, class F1, class ... Fs>
+  InputAligner(const rclcpp::Duration & timeout, F0 & f0, F1 & f1, Fs &... fs)
+  : Parent(timeout, f0, f1, fs ...)
+  {}
+
+  explicit InputAligner(const rclcpp::Duration & timeout)
+  : Parent(timeout)
+  {}
 };
 
 }  // namespace message_filters

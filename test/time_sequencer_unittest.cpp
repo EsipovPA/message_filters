@@ -35,14 +35,9 @@
 #include <rclcpp/rclcpp.hpp>
 #include "message_filters/time_sequencer.hpp"
 
-struct Header
-{
-  rclcpp::Time stamp;
-};
-
 struct Msg
 {
-  Header header;
+  std_msgs::msg::Header header;
   int data;
 };
 typedef std::shared_ptr<Msg> MsgPtr;

@@ -38,14 +38,14 @@
 #include "message_filters/sync_policies/approximate_time.hpp"
 #include "message_filters/message_traits.hpp"
 
-struct Header
-{
-  rclcpp::Time stamp;
-};
+// struct Header
+// {
+//   rclcpp::Time stamp;
+// };
 
 struct Msg
 {
-  Header header;
+  std_msgs::msg::Header header;
   int data;
 };
 typedef std::shared_ptr<Msg> MsgPtr;
@@ -129,8 +129,13 @@ private:
   const std::vector<TimeAndTopic> & input_;
   const std::vector<TimePair> & output_;
   unsigned int output_position_;
-  typedef message_filters::Synchronizer<message_filters::sync_policies::ApproximateTime<Msg,
-      Msg>> Sync2;
+  typedef message_filters::Synchronizer<
+      message_filters::sync_policies::ApproximateTimeBase<
+        message_filters::message_traits::TimeGetterBase,
+        Msg,
+        Msg
+      >
+  > Sync2;
 
 public:
   Sync2 sync_;
@@ -199,8 +204,15 @@ private:
   const std::vector<TimeAndTopic> & input_;
   const std::vector<TimeQuad> & output_;
   unsigned int output_position_;
-  typedef message_filters::Synchronizer<message_filters::sync_policies::ApproximateTime<Msg,
-      Msg, Msg, Msg>> Sync4;
+  typedef message_filters::Synchronizer<
+      message_filters::sync_policies::ApproximateTimeBase<
+        message_filters::message_traits::TimeGetterBase,
+        Msg,
+        Msg,
+        Msg,
+        Msg
+      >
+  > Sync4;
 
 public:
   Sync4 sync_;
@@ -217,7 +229,7 @@ TEST(ApproxTimeSync, ExactMatch) {
   std::vector<TimeAndTopic> input;
   std::vector<TimePair> output;
 
-  rclcpp::Time t(0, 0);
+  rclcpp::Time t(0, 0, RCL_ROS_TIME);
   rclcpp::Duration s(1, 0);
 
   input.push_back(TimeAndTopic(t, 0));     // a
@@ -243,7 +255,7 @@ TEST(ApproxTimeSync, PerfectMatch) {
   std::vector<TimeAndTopic> input;
   std::vector<TimePair> output;
 
-  rclcpp::Time t(0, 0);
+  rclcpp::Time t(0, 0, RCL_ROS_TIME);
   rclcpp::Duration s(1, 0);
 
   input.push_back(TimeAndTopic(t, 0));     // a
@@ -268,7 +280,7 @@ TEST(ApproxTimeSync, ImperfectMatch) {
   std::vector<TimeAndTopic> input;
   std::vector<TimePair> output;
 
-  rclcpp::Time t(0, 0);
+  rclcpp::Time t(0, 0, RCL_ROS_TIME);
   rclcpp::Duration s(1, 0);
 
   input.push_back(TimeAndTopic(t, 0));     // a
@@ -295,7 +307,7 @@ TEST(ApproxTimeSync, Acceleration) {
   std::vector<TimeAndTopic> input;
   std::vector<TimePair> output;
 
-  rclcpp::Time t(0, 0);
+  rclcpp::Time t(0, 0, RCL_ROS_TIME);
   rclcpp::Duration s(1, 0);
 
   input.push_back(TimeAndTopic(t, 0));      // a
@@ -322,7 +334,7 @@ TEST(ApproxTimeSync, DroppedMessages) {
   std::vector<TimeAndTopic> input;
   std::vector<TimePair> output;
 
-  rclcpp::Time t(0, 0);
+  rclcpp::Time t(0, 0, RCL_ROS_TIME);
   rclcpp::Duration s(1, 0);
 
   input.push_back(TimeAndTopic(t, 0));     // a
@@ -368,7 +380,7 @@ TEST(ApproxTimeSync, LongQueue) {
   std::vector<TimeAndTopic> input;
   std::vector<TimePair> output;
 
-  rclcpp::Time t(0, 0);
+  rclcpp::Time t(0, 0, RCL_ROS_TIME);
   rclcpp::Duration s(1, 0);
 
   input.push_back(TimeAndTopic(t, 0));     // a
@@ -405,7 +417,7 @@ TEST(ApproxTimeSync, DoublePublish) {
   std::vector<TimeAndTopic> input;
   std::vector<TimePair> output;
 
-  rclcpp::Time t(0, 0);
+  rclcpp::Time t(0, 0, RCL_ROS_TIME);
   rclcpp::Duration s(1, 0);
 
   input.push_back(TimeAndTopic(t, 0));     // a
@@ -433,7 +445,7 @@ TEST(ApproxTimeSync, FourTopics) {
   std::vector<TimeAndTopic> input;
   std::vector<TimeQuad> output;
 
-  rclcpp::Time t(0, 0);
+  rclcpp::Time t(0, 0, RCL_ROS_TIME);
   rclcpp::Duration s(1, 0);
 
   input.push_back(TimeAndTopic(t, 0));     // a
@@ -479,7 +491,7 @@ TEST(ApproxTimeSync, EarlyPublish) {
   std::vector<TimeAndTopic> input;
   std::vector<TimeQuad> output;
 
-  rclcpp::Time t(0, 0);
+  rclcpp::Time t(0, 0, RCL_ROS_TIME);
   rclcpp::Duration s(1, 0);
 
   input.push_back(TimeAndTopic(t, 0));     // a
@@ -503,7 +515,7 @@ TEST(ApproxTimeSync, RateBound) {
   std::vector<TimeAndTopic> input;
   std::vector<TimePair> output;
 
-  rclcpp::Time t(0, 0);
+  rclcpp::Time t(0, 0, RCL_ROS_TIME);
   rclcpp::Duration s(1, 0);
 
   input.push_back(TimeAndTopic(t, 0));     // a
