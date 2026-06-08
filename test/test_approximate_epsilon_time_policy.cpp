@@ -52,7 +52,7 @@ struct Header
 
 struct Msg
 {
-  Header header;
+  std_msgs::msg::Header header;
   int data;
 };
 using MsgPtr = std::shared_ptr<Msg>;

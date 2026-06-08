@@ -52,11 +52,11 @@ namespace message_filters
 namespace sync_policies
 {
 
-template<typename ... Ms>
-class ApproximateEpsilonTime : public PolicyBase<Ms...>
+template<template<typename GetterMessageType> typename TimeGetter, typename ... Ms>
+class ApproximateEpsilonTimeBase : public PolicyBase<Ms...>
 {
 public:
-  using Sync = Synchronizer<ApproximateEpsilonTime>;
+  using Sync = Synchronizer<ApproximateEpsilonTimeBase>;
   using Super = PolicyBase<Ms...>;
   using Messages = typename Super::Messages;
   using Signal = typename Super::Signal;
@@ -66,20 +66,20 @@ public:
 
   using Super::N_MESSAGES;
 
-  ApproximateEpsilonTime(uint32_t queue_size, rclcpp::Duration epsilon)
+  ApproximateEpsilonTimeBase(uint32_t queue_size, rclcpp::Duration epsilon)
   : parent_(nullptr)
     , queue_size_(queue_size)
     , epsilon_{epsilon}
   {
   }
 
-  ApproximateEpsilonTime(const ApproximateEpsilonTime & e)
+  ApproximateEpsilonTimeBase(const ApproximateEpsilonTimeBase & e)
   : epsilon_{e.epsilon_}
   {
     *this = e;
   }
 
-  ApproximateEpsilonTime & operator=(const ApproximateEpsilonTime & rhs)
+  ApproximateEpsilonTimeBase & operator=(const ApproximateEpsilonTimeBase & rhs)
   {
     parent_ = rhs.parent_;
     queue_size_ = rhs.queue_size_;
@@ -127,7 +127,7 @@ private:
       // this condition should not happen
       return current;
     }
-    auto candidate = mt::TimeStamp<typename ThisEventType::Message>::value(
+    auto candidate = mt::TimeStampCustom<typename ThisEventType::Message, TimeGetter>::value(
       *events_of_this_type.at(
         0).getMessage());
     if (current.first > candidate) {
@@ -167,7 +167,7 @@ private:
       // this condition should not happen
       return false;
     }
-    auto ts = mt::TimeStamp<typename ThisEventType::Message>::value(
+    auto ts = mt::TimeStampCustom<typename ThisEventType::Message, TimeGetter>::value(
       *events_of_this_type.at(
         0).getMessage());
     if (older.first + epsilon_ >= ts) {
@@ -228,7 +228,7 @@ private:
     if (this_vector.begin() == this_vector.end()) {
       return;
     }
-    auto event_ts = mt::TimeStamp<typename ThisEventType::Message>::value(
+    auto event_ts = mt::TimeStampCustom<typename ThisEventType::Message, TimeGetter>::value(
       *this_vector.at(0).getMessage());
     if (timestamp + epsilon_ < event_ts) {
       return;
@@ -290,6 +290,33 @@ private:
 
   std::mutex mutex_;
 };
+
+template<typename ... Ms>
+class ApproximateEpsilonTime : public ApproximateEpsilonTimeBase<message_traits::TimeGetterBase,
+    Ms...>
+{
+public:
+  typedef ApproximateEpsilonTimeBase<message_filters::message_traits::TimeGetterBase, Ms...> Parent;
+
+  ApproximateEpsilonTime(uint32_t queue_size, rclcpp::Duration epsilon)
+  : Parent(queue_size, epsilon)
+  {}
+
+  ApproximateEpsilonTime(const ApproximateEpsilonTime & e)
+  : Parent(e)
+  {}
+
+  ApproximateEpsilonTime & operator=(const ApproximateEpsilonTime & rhs)
+  {
+    return Parent::operator=(rhs);
+  }
+
+  void initParent(void * parent)
+  {
+    Parent::initParent(static_cast<Parent::Sync *>(parent));
+  }
+};
+
 
 }  // namespace sync_policies
 }  // namespace message_filters
