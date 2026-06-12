@@ -28,6 +28,12 @@
 
 """Input aligner for synchronizing messages from multiple sources based on their timestamps."""
 
+<<<<<<< HEAD
+=======
+from __future__ import annotations
+
+from dataclasses import dataclass
+>>>>>>> d1b4e46 (Defer annotation evaluation to fix RHEL import.)
 import heapq
 import threading
 import typing as tp
