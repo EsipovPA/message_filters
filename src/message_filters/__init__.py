@@ -34,7 +34,7 @@ from dataclasses import dataclass
 from functools import reduce
 import itertools
 import threading
-from typing import Optional, Type, Union
+from typing import Callable, Optional, Type, Union
 
 from builtin_interfaces.msg import Time as TimeMsg
 import rclpy
@@ -50,6 +50,7 @@ from rclpy.subscription_content_filter_options import ContentFilterOptions
 from rclpy.time import Time
 from rclpy.type_support import MsgT
 
+from .message_traits import get_time_from_message_header
 from .simple_filter import SimpleFilter
 
 
@@ -130,7 +131,13 @@ class Cache(SimpleFilter):
     much as you can, since the delays are unpredictable.
     """
 
-    def __init__(self, f, cache_size=1, allow_headerless=False):
+    def __init__(
+        self,
+        f,
+        cache_size=1,
+        allow_headerless=False,
+        time_getter: Callable[[MsgT], Time] = get_time_from_message_header,
+    ):
         SimpleFilter.__init__(self)
         self.connectInput(f)
         self.cache_size = cache_size
@@ -142,6 +149,8 @@ class Cache(SimpleFilter):
         # Whether to allow storing headerless messages with current ROS
         # time instead of timestamp.
         self.allow_headerless = allow_headerless
+
+        self.time_getter = time_getter
 
     def connectInput(self, f):
         self.incoming_connection = f.registerCallback(self.add)
@@ -162,9 +171,7 @@ class Cache(SimpleFilter):
 
             stamp = ROSClock().now()
         else:
-            stamp = msg.header.stamp
-            if not hasattr(stamp, 'nanoseconds'):
-                stamp = Time.from_msg(stamp)
+            stamp = self.time_getter(msg)
         # Insert sorted
         self.cache_times.append(stamp)
         self.cache_msgs.append(msg)
@@ -301,11 +308,17 @@ class TimeSynchronizer(SimpleFilter):
     while waiting for messages to arrive and complete their "set".
     """
 
-    def __init__(self, fs, queue_size):
+    def __init__(
+        self,
+        fs,
+        queue_size,
+        time_getter: Callable[[MsgT], Time] = get_time_from_message_header,
+    ):
         SimpleFilter.__init__(self)
         self.connectInput(fs)
         self.queue_size = queue_size
         self.lock = threading.Lock()
+        self.time_getter = time_getter
 
     def connectInput(self, fs):
         self.queues = [{} for f in fs]
@@ -315,7 +328,7 @@ class TimeSynchronizer(SimpleFilter):
 
     def add(self, msg, my_queue, my_queue_index=None):
         self.lock.acquire()
-        stamp = Time.from_msg(msg.header.stamp)
+        stamp = self.time_getter(msg)
         my_queue[stamp.nanoseconds] = msg
         while len(my_queue) > self.queue_size:
             del my_queue[min(my_queue)]
@@ -361,15 +374,22 @@ class ApproximateTimeSynchronizer(TimeSynchronizer):
     avoid this as much as you can, since the delays are unpredictable.
     """
 
-    def __init__(self, fs, queue_size, slop,
-                 queue_offset=False,
-                 allow_headerless=False,
-                 sync_arrival_time=False):
+    def __init__(
+        self,
+        fs,
+        queue_size,
+        slop,
+        queue_offset=False,
+        allow_headerless=False,
+        sync_arrival_time=False,
+        time_getter: Callable[[MsgT], Time] = get_time_from_message_header,
+    ):
         TimeSynchronizer.__init__(self, fs, queue_size)
         self.slop = Duration(seconds=slop)
         self.allow_headerless = allow_headerless
         self.queue_offset = queue_offset
         self.sync_arrival_time = sync_arrival_time
+        self.time_getter = time_getter
 
     def add(self, msg, my_queue, my_queue_index=None):
         if not hasattr(msg, 'header') or not hasattr(msg.header, 'stamp') or \
@@ -387,10 +407,7 @@ class ApproximateTimeSynchronizer(TimeSynchronizer):
 
             stamp = ROSClock().now()
         else:
-            stamp = msg.header.stamp
-            if not hasattr(stamp, 'nanoseconds'):
-                stamp = Time.from_msg(stamp)
-            # print(stamp)
+            stamp = self.time_getter(msg)
         new_timestamp = stamp.nanoseconds
         if my_queue_index is not None and self.queue_offset:
             new_timestamp -= self.queue_offset[my_queue_index]
