@@ -27,9 +27,6 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 """Input aligner for synchronizing messages from multiple sources based on their timestamps."""
-
-from __future__ import annotations
-
 import heapq
 import threading
 import typing as tp
@@ -38,7 +35,6 @@ from builtin_interfaces.msg import Time as TimeMsg
 from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.time import Time
-from rclpy.node import MsgType
 
 from .simple_filter import SimpleFilter
 
@@ -179,7 +175,7 @@ class InputAligner:
     def registerCallback(
         self,
         index: int,
-        callback: tp.Callable[tp.Concatenate[MsgType, P], None],
+        callback: tp.Callable,
         *args: tp.Any,
     ) -> int:
         return self.signals[index].registerCallback(callback, *args)
