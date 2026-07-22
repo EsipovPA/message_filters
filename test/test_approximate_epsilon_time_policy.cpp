@@ -40,9 +40,14 @@
 #include "message_filters/sync_policies/approximate_epsilon_time.hpp"
 #include "message_filters/message_traits.hpp"
 
+struct Header
+{
+  rclcpp::Time stamp;
+};
+
 struct Msg
 {
-  std_msgs::msg::Header header;
+  Header header;
   int data;
 };
 using MsgPtr = std::shared_ptr<Msg>;

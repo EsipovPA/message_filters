@@ -40,63 +40,6 @@ namespace message_filters
 {
 
 /**
- * \brief Synchronizes up to N messages by their timestamps acquired by user-provided custom TimeGetter.
- *
- * TimeSynchronizerBase synchronizes up to N incoming channels by the timestamps contained in their messages' headers.
- * TimeSynchronizerBase takes anywhere from 2 to N message types as template parameters, and passes them through to a
- * callback which takes a shared pointer of each.
- *
- * The required queue size parameter when constructing the TimeSynchronizerBase tells it how many sets of messages it should
- * store (by timestamp) while waiting for messages to arrive and complete their "set"
- *
- * \section connections CONNECTIONS
- *
- * The input connections for the TimeSynchronizerBase object is the same signature as for rclcpp subscription callbacks, ie.
-\verbatim
-void callback(const std::shared_ptr<M const>&);
-\endverbatim
- * The output connection for the TimeSynchronizerBase object is dependent on the number of messages being synchronized. For
- * a 3-message synchronizer for example, it would be:
-\verbatim
-void callback(const std::shared_ptr<M0 const>&, const std::shared_ptr<M1 const>&, const std::shared_ptr<M2 const>&);
-\endverbatim
- * \section usage USAGE
- * Example usage would be:
-\verbatim
-TimeSynchronizerBase<TimeGetterBase, sensor_msgs::msg::CameraInfo, sensor_msgs::msg::Image, sensor_msgs::msg::Image> sync_policies(caminfo_sub, limage_sub, rimage_sub, 3);
-sync_policies.registerCallback(callback);
-\endverbatim
-
- * The callback is then of the form:
-\verbatim
-void callback(const sensor_msgs::msg::CameraInfo::SharedPtr, const sensor_msgs::msg::Image::SharedPtr, const sensor_msgs::msg::Image::SharedPtr);
-\endverbatim
- *
- */
-template<template<typename GetterMessageType> typename TimeGetter, class ... Ms>
-class TimeSynchronizerBase : public Synchronizer<sync_policies::ExactTimeBase<TimeGetter, Ms...>>
-{
-public:
-  using Policy = sync_policies::ExactTimeBase<TimeGetter, Ms...>;
-  using Base = Synchronizer<Policy>;
-
-  using Base::add;
-  using Base::connectInput;
-  using Base::registerCallback;
-  using Base::setName;
-  using Base::getName;
-  using Policy::registerDropCallback;
-
-  template<class ... Fs>
-  TimeSynchronizerBase(uint32_t queue_size, Fs &... fs)
-  : Base(Policy(queue_size))
-  {
-    connectInput(fs ...);
-  }
-};
-
-
-/**
  * \brief Synchronizes up to N messages by their timestamps.
  *
  * TimeSynchronizer synchronizes up to N incoming channels by the timestamps contained in their messages' headers.
@@ -105,6 +48,11 @@ public:
  *
  * The required queue size parameter when constructing the TimeSynchronizer tells it how many sets of messages it should
  * store (by timestamp) while waiting for messages to arrive and complete their "set"
+ *
+ * The timestamp is extracted by the TimeGetter template parameter, which defaults to
+ * message_traits::DefaultTimeGetter (header.stamp via the TimeStamp trait).  Use the
+ * TimeSynchronizerBase spelling to supply a custom getter, e.g.
+ * TimeSynchronizerBase<MyTimeGetter, M0, M1>.
  *
  * \section connections CONNECTIONS
  *
@@ -130,15 +78,31 @@ void callback(const sensor_msgs::msg::CameraInfo::SharedPtr, const sensor_msgs::
 \endverbatim
  *
  */
-template<class ... Ms>
-class TimeSynchronizer : public TimeSynchronizerBase<message_traits::TimeGetterBase, Ms ...>
+template<template<typename> typename TimeGetter, class ... Ms>
+requires (message_traits::TimeGetterFor<TimeGetter, Ms>&& ...)
+class TimeSynchronizerBase : public Synchronizer<sync_policies::ExactTimeBase<TimeGetter, Ms...>>
 {
 public:
+  using Policy = sync_policies::ExactTimeBase<TimeGetter, Ms...>;
+  using Base = Synchronizer<Policy>;
+
+  using Base::add;
+  using Base::connectInput;
+  using Base::registerCallback;
+  using Base::setName;
+  using Base::getName;
+  using Policy::registerDropCallback;
+
   template<class ... Fs>
-  TimeSynchronizer(uint32_t queue_size, Fs &... fs)
-  : TimeSynchronizerBase<message_traits::TimeGetterBase, Ms ...>(queue_size, fs ...)
-  {}
+  TimeSynchronizerBase(uint32_t queue_size, Fs &... fs)
+  : Base(Policy(queue_size))
+  {
+    connectInput(fs ...);
+  }
 };
+
+template<class ... Ms>
+using TimeSynchronizer = TimeSynchronizerBase<message_traits::DefaultTimeGetter, Ms...>;
 
 }  // namespace message_filters
 

@@ -75,7 +75,8 @@ void callback(const std::shared_ptr<M const>&);
  *
  */
 template<class M,
-  template<typename GetterMessageType> typename TimeGetter = message_traits::TimeGetterBase>
+  template<typename> typename TimeGetter = message_traits::DefaultTimeGetter>
+requires message_traits::TimeGetterFor<TimeGetter, M>
 class TimeSequencer : public SimpleFilter<M>
 {
 public:
@@ -147,10 +148,8 @@ public:
 
   void add(const EventType & evt)
   {
-    namespace mt = message_filters::message_traits;
-
     std::lock_guard<std::mutex> lock(messages_mutex_);
-    if (mt::TimeStampCustom<M, TimeGetter>::value(*evt.getMessage()) < last_time_) {
+    if (TimeGetter<M>::getTime(*evt.getMessage()) < last_time_) {
       return;
     }
 
@@ -176,9 +175,8 @@ private:
 public:
     bool operator()(const EventType & lhs, const EventType & rhs) const
     {
-      namespace mt = message_filters::message_traits;
-      return mt::TimeStampCustom<M, TimeGetter>::value(*lhs.getMessage()) <
-             mt::TimeStampCustom<M, TimeGetter>::value(*rhs.getMessage());
+      return TimeGetter<M>::getTime(*lhs.getMessage()) <
+             TimeGetter<M>::getTime(*rhs.getMessage());
     }
   };
   using S_Message = std::multiset<EventType, MessageSort>;
@@ -191,8 +189,6 @@ public:
 
   void dispatch()
   {
-    namespace mt = message_filters::message_traits;
-
     V_Message to_call;
 
     {
@@ -201,7 +197,7 @@ public:
       const rclcpp::Time now = node_->get_clock()->now();
       auto it = messages_.begin();
       while (it != messages_.end()) {
-        const rclcpp::Time stamp = mt::TimeStampCustom<M, TimeGetter>::value(*it->getMessage());
+        const rclcpp::Time stamp = TimeGetter<M>::getTime(*it->getMessage());
         if ((stamp + delay_) <= now) {
           last_time_ = stamp;
           to_call.push_back(*it);

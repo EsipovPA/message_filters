@@ -48,7 +48,8 @@ namespace message_filters
 namespace sync_policies
 {
 
-template<template<typename GetterMessageType> typename TimeGetter, typename ... Ms>
+template<template<typename> typename TimeGetter, typename ... Ms>
+requires (message_traits::TimeGetterFor<TimeGetter, Ms>&& ...)
 struct ExactTimeBase : public PolicyBase<Ms...>
 {
   using Sync = Synchronizer<ExactTimeBase>;
@@ -90,12 +91,11 @@ struct ExactTimeBase : public PolicyBase<Ms...>
   {
     assert(parent_);
 
-    namespace mt = message_filters::message_traits;
     using Message = std::tuple_element_t<i, Messages>;
 
     std::lock_guard<std::mutex> lock(mutex_);
 
-    Tuple & t = tuples_[mt::TimeStampCustom<Message, TimeGetter>::value(*evt.getMessage())];
+    Tuple & t = tuples_[TimeGetter<Message>::getTime(*evt.getMessage())];
     std::get<i>(t) = evt;
 
     checkTuple(t);
@@ -138,15 +138,13 @@ private:
   // assumes mutex_ is already locked
   void checkTuple(Tuple & t)
   {
-    namespace mt = message_filters::message_traits;
-
     const bool full = isFull(t, std::make_index_sequence<std::tuple_size_v<Tuple>>{});
 
     if (full) {
       std::apply([this](auto &&... args) {this->parent_->signal(args ...);}, t);
 
       using M0 = std::tuple_element_t<0, std::tuple<Ms...>>;
-      last_signal_time_ = mt::TimeStampCustom<M0, TimeGetter>::value(*std::get<0>(t).getMessage());
+      last_signal_time_ = TimeGetter<M0>::getTime(*std::get<0>(t).getMessage());
 
       tuples_.erase(last_signal_time_);
 
@@ -195,28 +193,7 @@ private:
 };
 
 template<typename ... Ms>
-struct ExactTime : public ExactTimeBase<message_traits::TimeGetterBase, Ms...>
-{
-  typedef ExactTimeBase<message_filters::message_traits::TimeGetterBase, Ms...> Parent;
-
-  ExactTime(uint32_t queue_size)    // NOLINT(runtime/explicit)
-  : ExactTimeBase<message_traits::TimeGetterBase, Ms...>(queue_size)
-  {}
-
-  ExactTime(const ExactTime & e)
-  : Parent(e)
-  {}
-
-  ExactTime & operator=(const ExactTime & rhs)
-  {
-    return Parent::operator=(rhs);
-  }
-
-  void initParent(void * parent)
-  {
-    Parent::initParent(static_cast<Parent::Sync *>(parent));
-  }
-};
+using ExactTime = ExactTimeBase<message_traits::DefaultTimeGetter, Ms...>;
 
 }  // namespace sync_policies
 }  // namespace message_filters

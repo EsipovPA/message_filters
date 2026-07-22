@@ -32,8 +32,8 @@
 #ifndef MESSAGE_FILTERS__MESSAGE_TRAITS_HPP_
 #define MESSAGE_FILTERS__MESSAGE_TRAITS_HPP_
 
+#include <concepts>
 #include <string>
-#include <stdexcept>
 #include <type_traits>
 
 #include <rclcpp/time.hpp>
@@ -46,149 +46,98 @@ namespace message_traits
 
 /**
  * False if the message does not have a header
- * @tparam MessageType
+ * @tparam M
  */
-template<typename MessageType, typename = void>
+template<typename M, typename = void>
 struct HasHeader : public std::false_type {};
 
 /**
  * True if the message has a field named 'header' with a type of std_msgs::msg::Header
- * @tparam MessageType
+ * @tparam M
  */
-template<typename MessageType>
-struct HasHeader<MessageType, typename std::enable_if<std::is_same<std_msgs::msg::Header,
-  decltype(MessageType().header)>::value>::type>: public std::true_type {};
+template<typename M>
+struct HasHeader<M, typename std::enable_if<std::is_same<std_msgs::msg::Header,
+  decltype(M().header)>::value>::type>: public std::true_type {};
 
 /**
  * \brief FrameId trait.  In the default implementation pointer()
- * returns &m.header.frame_id if HasHeader<MessageType>::value is true, otherwise returns NULL.  value()
+ * returns &m.header.frame_id if HasHeader<M>::value is true, otherwise returns NULL.  value()
  * does not exist, and causes a compile error
  */
-template<typename MessageType, typename Enable = void>
+template<typename M, typename Enable = void>
 struct FrameId
 {
-  static std::string * pointer(MessageType & m) {(void)m; return nullptr;}
-  static std::string const * pointer(const MessageType & m) {(void)m; return nullptr;}
+  static std::string * pointer(M & m) {(void)m; return nullptr;}
+  static std::string const * pointer(const M & m) {(void)m; return nullptr;}
 };
-template<typename MessageType>
-struct FrameId<MessageType, typename std::enable_if<HasHeader<MessageType>::value>::type>
+template<typename M>
+struct FrameId<M, typename std::enable_if<HasHeader<M>::value>::type>
 {
-  static std::string * pointer(MessageType & m) {return &m.header.frame_id;}
-  static std::string const * pointer(const MessageType & m) {return &m.header.frame_id;}
-  static std::string value(const MessageType & m) {return m.header.frame_id;}
-};
-
-/**
- * \brief TimeGetterBase is a virtual abstract class
- * The actual class should implement the getTime method
- * that should retrieve rclcpp::Time from a message
- */
-template<typename MessageType>
-class TimeGetterBase
-{
-public:
-  static rclcpp::Time getTime(const MessageType & message)
-  {
-    (void)message;
-    throw std::logic_error("getTime not implemented for base TimeGetterBase class");
-  }
-};
-
-template<typename MessageType>
-class HeaderTime : public TimeGetterBase<MessageType>
-{
-public:
-  static rclcpp::Time getTime(const MessageType & message)
-  {
-    return rclcpp::Time(message.header.stamp, RCL_ROS_TIME);
-  }
-};
-
-
-template<typename MessageType>
-class NullTime : public TimeGetterBase<MessageType>
-{
-public:
-  static rclcpp::Time getTime(const MessageType & message)
-  {
-    (void)message;
-    return rclcpp::Time(0, 0, RCL_ROS_TIME);
-  }
-};
-
-
-template<typename MessageType, template<typename GetterMessageType> typename TimeGetter>
-class TimeStampBase
-{
-public:
-  static rclcpp::Time value(const MessageType & message)
-  {
-    return TimeGetter<MessageType>::getTime(message);
-  }
+  static std::string * pointer(M & m) {return &m.header.frame_id;}
+  static std::string const * pointer(const M & m) {return &m.header.frame_id;}
+  static std::string value(const M & m) {return m.header.frame_id;}
 };
 
 /**
  * \brief TimeStamp trait.  In the default implementation pointer()
- * returns &m.header.stamp if HasHeader<MessageType>::value is true, otherwise returns NULL.  value()
+ * returns &m.header.stamp if HasHeader<M>::value is true, otherwise returns NULL.  value()
  * does not exist, and causes a compile error
  */
-template<typename MessageType, typename Enable = void>
-struct TimeStamp;
+template<typename M, typename Enable = void>
+struct TimeStamp
+{
+  static rclcpp::Time value(const M & m)
+  {
+    (void)m;
+    return rclcpp::Time(0, 0, RCL_ROS_TIME);
+  }
+};
 
-template<typename MessageType>
-struct TimeStamp<MessageType, typename std::enable_if_t<!HasHeader<MessageType>::value>>
-  : public TimeStampBase<MessageType, NullTime>
-{};
+template<typename M>
+struct TimeStamp<M, typename std::enable_if<HasHeader<M>::value>::type>
+{
+  static rclcpp::Time value(const M & m)
+  {
+    return rclcpp::Time(m.header.stamp, RCL_ROS_TIME);
+  }
+};
 
-template<typename MessageType>
-struct TimeStamp<MessageType, typename std::enable_if_t<HasHeader<MessageType>::value>>
-  : public TimeStampBase<MessageType, HeaderTime>
-{};
+/**
+ * \brief Default TimeGetter used by all filters.
+ *
+ * Delegates to the TimeStamp trait, so messages with a std_msgs::msg::Header
+ * use header.stamp, headerless messages get a zero time, and existing user
+ * specializations of TimeStamp keep working unchanged.
+ */
+template<typename M>
+struct DefaultTimeGetter
+{
+  static rclcpp::Time getTime(const M & m)
+  {
+    return TimeStamp<M>::value(m);
+  }
+};
 
-template<
-  typename MessageType,
-  template<typename GetterMessageType> typename TimeGetter,
-  typename Enable = void
->
-struct TimeStampCustom;
-
-template<
-  typename MessageType,
-  template<typename GetterMessageType> typename TimeGetter
->
-struct TimeStampCustom<
-  MessageType,
-  TimeGetter,
-  typename std::enable_if_t<
-    !HasHeader<MessageType>::value &&
-    std::is_same_v<TimeGetter<MessageType>, TimeGetterBase<MessageType>>
-  >
->: public TimeStampBase<MessageType, NullTime>
-{};
-
-template<
-  typename MessageType,
-  template<typename GetterMessageType> typename TimeGetter
->
-struct TimeStampCustom<
-  MessageType,
-  TimeGetter,
-  typename std::enable_if_t<HasHeader<MessageType>::value && std::is_same_v<TimeGetter<MessageType>,
-  TimeGetterBase<MessageType>>>
->: public TimeStampBase<MessageType, HeaderTime>
-{};
-
-
-template<
-  typename MessageType,
-  template<typename GetterMessageType> typename TimeGetter
->
-struct TimeStampCustom<
-  MessageType,
-  TimeGetter,
-  typename std::enable_if_t<!std::is_same_v<TimeGetter<MessageType>, TimeGetterBase<MessageType>>>
->: public TimeStampBase<MessageType, TimeGetter>
-{};
+/**
+ * \brief Constraint for user-provided time getters.
+ *
+ * A TimeGetter must expose a static getTime() accepting a const reference to
+ * the message and returning something convertible to rclcpp::Time, e.g.:
+ * \verbatim
+ * template<typename M>
+ * struct MyTimeGetter
+ * {
+ *   static rclcpp::Time getTime(const M & m)
+ *   {
+ *     return rclcpp::Time(m.sec, m.nanosec, RCL_ROS_TIME);
+ *   }
+ * };
+ * \endverbatim
+ */
+template<template<typename> typename TimeGetter, typename M>
+concept TimeGetterFor = requires(const M & m) {
+  {TimeGetter<M>::getTime(m)}->std::convertible_to<rclcpp::Time>;
+};  // NOLINT(readability/braces) -- cpplint misreads the compound requirement
 
 }  // namespace message_traits
 }  // namespace message_filters

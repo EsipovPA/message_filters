@@ -144,6 +144,11 @@ if(BUILD_TESTING)
     target_link_libraries(${PROJECT_NAME}-test_message_filters_delta_filter ${PROJECT_NAME})
   endif()
 
+  ament_add_gtest(${PROJECT_NAME}-test_custom_time_getter test/test_custom_time_getter.cpp)
+  if(TARGET ${PROJECT_NAME}-test_custom_time_getter)
+    target_link_libraries(${PROJECT_NAME}-test_custom_time_getter ${PROJECT_NAME})
+  endif()
+
   # python tests with python interfaces of message filters
   find_package(ament_cmake_pytest REQUIRED)
   ament_add_pytest_test(test_time_synchronizer.py "test/test_time_synchronizer.py")
@@ -151,6 +156,7 @@ if(BUILD_TESTING)
   ament_add_pytest_test(test_message_filters_cache.py "test/test_message_filters_cache.py")
   ament_add_pytest_test(test_message_filters_chain.py "test/test_message_filters_chain.py")
   ament_add_pytest_test(test_input_aligner.py "test/test_input_aligner.py")
+  ament_add_pytest_test(test_custom_time_getter.py "test/test_custom_time_getter.py")
 endif()
 
 ament_package()

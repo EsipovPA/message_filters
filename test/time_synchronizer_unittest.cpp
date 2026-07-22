@@ -35,9 +35,14 @@
 #include "message_filters/message_traits.hpp"
 #include <rclcpp/rclcpp.hpp>
 
+struct Header
+{
+  rclcpp::Time stamp;
+};
+
 struct Msg
 {
-  std_msgs::msg::Header header;
+  Header header;
   int data;
 };
 typedef std::shared_ptr<Msg> MsgPtr;
