@@ -136,7 +136,7 @@ class Cache(SimpleFilter):
         f,
         cache_size=1,
         allow_headerless=False,
-        time_getter: Callable[[MsgT], Time] = get_time_from_message_header,
+        time_getter: Callable[[MsgT], Optional[Time]] = get_time_from_message_header,
     ):
         SimpleFilter.__init__(self)
         self.connectInput(f)
@@ -156,7 +156,8 @@ class Cache(SimpleFilter):
         self.incoming_connection = f.registerCallback(self.add)
 
     def add(self, msg):
-        if not hasattr(msg, 'header') or not hasattr(msg.header, 'stamp'):
+        stamp = self.time_getter(msg)
+        if stamp is None:
             if not self.allow_headerless:
                 msg_filters_logger = rclpy.logging.get_logger('message_filters_cache')
                 msg_filters_logger.set_level(LoggingSeverity.INFO)
@@ -170,8 +171,6 @@ class Cache(SimpleFilter):
                 return
 
             stamp = ROSClock().now()
-        else:
-            stamp = self.time_getter(msg)
         # Insert sorted
         self.cache_times.append(stamp)
         self.cache_msgs.append(msg)
@@ -312,7 +311,7 @@ class TimeSynchronizer(SimpleFilter):
         self,
         fs,
         queue_size,
-        time_getter: Callable[[MsgT], Time] = get_time_from_message_header,
+        time_getter: Callable[[MsgT], Optional[Time]] = get_time_from_message_header,
     ):
         SimpleFilter.__init__(self)
         self.connectInput(fs)
@@ -327,8 +326,13 @@ class TimeSynchronizer(SimpleFilter):
             for i_q, (f, q) in enumerate(zip(fs, self.queues))]
 
     def add(self, msg, my_queue, my_queue_index=None):
-        self.lock.acquire()
         stamp = self.time_getter(msg)
+        if stamp is None:
+            raise ValueError(
+                'time_getter could not extract a timestamp from the message; '
+                'use ApproximateTimeSynchronizer with "allow_headerless=True" '
+                'or provide a custom "time_getter"')
+        self.lock.acquire()
         my_queue[stamp.nanoseconds] = msg
         while len(my_queue) > self.queue_size:
             del my_queue[min(my_queue)]
@@ -382,7 +386,7 @@ class ApproximateTimeSynchronizer(TimeSynchronizer):
         queue_offset=False,
         allow_headerless=False,
         sync_arrival_time=False,
-        time_getter: Callable[[MsgT], Time] = get_time_from_message_header,
+        time_getter: Callable[[MsgT], Optional[Time]] = get_time_from_message_header,
     ):
         TimeSynchronizer.__init__(self, fs, queue_size)
         self.slop = Duration(seconds=slop)
@@ -392,8 +396,8 @@ class ApproximateTimeSynchronizer(TimeSynchronizer):
         self.time_getter = time_getter
 
     def add(self, msg, my_queue, my_queue_index=None):
-        if not hasattr(msg, 'header') or not hasattr(msg.header, 'stamp') or \
-                self.sync_arrival_time:
+        stamp = None if self.sync_arrival_time else self.time_getter(msg)
+        if stamp is None:
             if not self.allow_headerless and not self.sync_arrival_time:
                 msg_filters_logger = rclpy.logging.get_logger('message_filters_approx')
                 msg_filters_logger.set_level(LoggingSeverity.INFO)
@@ -406,8 +410,6 @@ class ApproximateTimeSynchronizer(TimeSynchronizer):
                 return
 
             stamp = ROSClock().now()
-        else:
-            stamp = self.time_getter(msg)
         new_timestamp = stamp.nanoseconds
         if my_queue_index is not None and self.queue_offset:
             new_timestamp -= self.queue_offset[my_queue_index]

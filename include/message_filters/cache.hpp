@@ -61,12 +61,19 @@ void callback(const std::shared_ptr<M const> &);
 \endverbatim
  */
 template<class M,
-  template<typename GetterMessageType> typename TimeGetter = message_traits::TimeGetterBase>
+  template<typename> typename TimeGetter = message_traits::DefaultTimeGetter>
+requires message_traits::TimeGetterFor<TimeGetter, M>
 class Cache : public SimpleFilter<M>
 {
 public:
   using MConstPtr = std::shared_ptr<M const>;
   using EventType = MessageEvent<M const>;
+
+  // A custom TimeGetter extracts the timestamp itself, so the headerless
+  // fallback only applies when the default getter has no header to read.
+  static constexpr bool kMessageProvidesTime =
+    message_traits::HasHeader<M>::value ||
+    !std::is_same_v<TimeGetter<M>, message_traits::DefaultTimeGetter<M>>;
 
   template<class F>
   explicit Cache(F & f, unsigned int cache_size = 1)
@@ -78,7 +85,7 @@ public:
     setCacheSize(cache_size);
     connectInput(f);
 
-    if (message_filters::message_traits::HasHeader<M>::value) {
+    if (kMessageProvidesTime) {
       getMessageTime = getMessageTimeFromHeader;
     } else if (allow_headerless) {
       getMessageTime = getMessageReceiveTime;
@@ -104,7 +111,7 @@ public:
   {
     setCacheSize(cache_size);
 
-    if (message_filters::message_traits::HasHeader<M>::value) {
+    if (kMessageProvidesTime) {
       getMessageTime = getMessageTimeFromHeader;
     } else if (allow_headerless) {
       getMessageTime = getMessageReceiveTime;
@@ -346,8 +353,7 @@ private:
 
   static rclcpp::Time getMessageTimeFromHeader(const EventType & evt)
   {
-    return message_filters::message_traits::TimeStampCustom<M,
-             TimeGetter>::value(*(evt.getMessage()));
+    return TimeGetter<M>::getTime(*(evt.getMessage()));
   }
 
   static rclcpp::Time getMessageReceiveTime(const EventType & evt)

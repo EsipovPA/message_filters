@@ -27,11 +27,23 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 
+from typing import Optional
+
 from rclpy.time import Time
 from rclpy.type_support import MsgT
 
 
-def get_time_from_message_header(message: MsgT) -> Time:
+def get_time_from_message_header(message: MsgT) -> Optional[Time]:
+    """
+    Extract the timestamp from a message's header.
+
+    This is the default ``time_getter`` used by the filters. A time getter
+    returns the message's timestamp as an :class:`rclpy.time.Time`, or None
+    when it cannot extract one; the calling filter then applies its
+    headerless-message policy (e.g. ``allow_headerless``).
+    """
+    if not hasattr(message, 'header') or not hasattr(message.header, 'stamp'):
+        return None
     timestamp = message.header.stamp
     if not hasattr(timestamp, 'nanoseconds'):
         timestamp = Time.from_msg(timestamp)

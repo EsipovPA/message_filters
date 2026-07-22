@@ -51,7 +51,7 @@ struct Header
 
 struct Msg
 {
-  std_msgs::msg::Header header;
+  Header header;
   int data;
 };
 typedef std::shared_ptr<Msg> MsgPtr;
