@@ -26,12 +26,10 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from typing import Callable, Optional
-
-import rclpy
+from typing import Callable, Optional, List
+import warnings
 
 from rclpy.clock import ROSClock
-from rclpy.logging import LoggingSeverity
 from rclpy.time import Time
 from rclpy.type_support import MsgT
 
@@ -53,13 +51,37 @@ class Cache(SimpleFilter):
 
     def __init__(
         self,
-        f,
-        cache_size=1,
-        allow_headerless=False,
+        message_filter: Optional[SimpleFilter] = None,
+        cache_size: int = 1,
+        allow_headerless: bool = False,
         time_getter: Callable[[MsgT], Optional[Time]] = get_time_from_message_header,
+        *,
+        f: Optional[SimpleFilter] = None,
     ):
+        """
+        Construct a Cache filter.
+
+        :param message_filter: The input filter to connect to and monitor for incoming messages.
+        :param cache_size: The maximum number of messages to keep in the ring buffer.
+        :param allow_headerless: If True, allow storing messages without a header timestamp
+            by assigning the current ROS time. If False, raises a RuntimeError for headerless messages.
+        :param time_getter: A callable function to extract the timestamp from a message.
+            Defaults to extracting from the standard message header.
+        :param f: Deprecated alias for ``message_filter``.
+        """
         SimpleFilter.__init__(self)
-        self.connectInput(f)
+
+        if f is not None:
+            warnings.warn(
+                message=f'The "f" argument is deprecated '
+                        f'and will be removed in a future release. '
+                        f'Use "message_filter" instead.',
+                category=DeprecationWarning,
+                stacklevel=2,   # to show the user's line of code causing the warning
+            )
+        message_filter = message_filter or f
+
+        self.connectInput(message_filter)
         self.cache_size = cache_size
         # Array to store messages
         self.cache_msgs = []
@@ -72,24 +94,59 @@ class Cache(SimpleFilter):
 
         self.time_getter = time_getter
 
-    def connectInput(self, f):
-        self.incoming_connection = f.registerCallback(self.add)
+    def connectInput(
+        self,
+        message_filter: Optional[SimpleFilter] = None,
+        *,
+        f: Optional[SimpleFilter] = None,
+    ):
+        """
+        Connect the cache to an input message filter stream.
 
-    def add(self, msg):
+        Registers the cache's ``add`` method as a callback to the provided filter.
+
+        :param message_filter: The input filter to connect to.
+        :param f: Deprecated alias for ``message_filter``.
+        """
+        if f is not None:
+            warnings.warn(
+                message=f'The "f" argument is deprecated '
+                        f'and will be removed in a future release. '
+                        f'Use "message_filter" instead.',
+                category=DeprecationWarning,
+                stacklevel=2,   # to show the user's line of code causing the warning
+            )
+        if not message_filter and not f:
+            raise RuntimeError(
+                "Unable to connect import. No `message_filter` nor `f` values provided."
+            )
+        message_filter = message_filter or f
+        self.incoming_connection = message_filter.registerCallback(self.add)
+
+    def add(self, msg: MsgT):
+        """
+        Process and add a new message to the cache.
+
+        Extracts the timestamp from the message. If the buffer size exceeds ``cache_size``,
+        the oldest message is discarded. Finally, triggers notifications for down-stream filters.
+
+        :param msg: The incoming message to add to the cache ring buffer.
+        :raises RuntimeError: If the message lacks a timestamp and ``allow_headerless`` is False.
+        """
         stamp = self.time_getter(msg)
         if stamp is None:
             if not self.allow_headerless:
-                msg_filters_logger = rclpy.logging.get_logger('message_filters_cache')
-                msg_filters_logger.set_level(LoggingSeverity.INFO)
-                # TODO: This should be an exception!
-                msg_filters_logger.warning('can not use message filters messages '
-                                           'without timestamp infomation when '
-                                           '"allow_headerless" is disabled. '
-                                           'auto assign ROSTIME to headerless '
-                                           'messages once enabling constructor '
-                                           'option of "allow_headerless".')
-
-                return
+                # Same behavior as a C++ implementation
+                # TODO: Deprecate publishing warnings for older versions of ROS2.
+                # TODO: Throw exception in rolling
+                raise RuntimeError(
+                    'Can not use message filters messages '
+                    'without timestamp information when '
+                    '"allow_headerless" is disabled. '
+                    'Auto assign ROSTIME to headerless '
+                    'messages once enabling constructor '
+                    'option of "allow_headerless".'
+                )
 
             stamp = ROSClock().now()
         # Insert sorted
@@ -104,42 +161,77 @@ class Cache(SimpleFilter):
         # Signal new input
         self.signalMessage(msg)
 
-    def getInterval(self, from_stamp, to_stamp):
-        """Query the current cache content between from_stamp to to_stamp."""
+    def getInterval(self, from_stamp: Time, to_stamp: Time) -> List[MsgT]:
+        """
+        Query the current cache content between from_stamp to to_stamp.
+
+        :param from_stamp: The start timestamp of the desired interval (inclusive).
+        :param to_stamp: The end timestamp of the desired interval (inclusive).
+        :return: A list of messages that fall within the specified time interval.
+        :rtype: list[MsgT]
+        """
         assert from_stamp <= to_stamp
 
         return [msg for (msg, time) in zip(self.cache_msgs, self.cache_times)
                 if from_stamp <= time <= to_stamp]
 
-    def getElemAfterTime(self, stamp):
-        """Return the oldest element after or equal the passed time stamp."""
+    def getElemAfterTime(self, stamp: Time) -> Optional[MsgT]:
+        """
+        Return the oldest element after or equal the passed time stamp.
+
+        :param stamp: The reference timestamp threshold.
+        :return: The oldest message with a timestamp >= ``stamp``, or None if no such message exists.
+        :rtype: Optional[MsgT]
+        """
         newer = [msg for (msg, time) in zip(self.cache_msgs, self.cache_times)
                  if time >= stamp]
         if not newer:
             return None
         return newer[0]
 
-    def getElemBeforeTime(self, stamp):
-        """Return the newest element before or equal the passed time stamp."""
+    def getElemBeforeTime(self, stamp: Time) -> Optional[MsgT]:
+        """
+        Return the newest element before or equal the passed time stamp.
+
+        :param stamp: The reference timestamp threshold.
+        :return: The newest message with a timestamp <= ``stamp``, or None if no such message exists.
+        :rtype: Optional[MsgT]
+        """
         older = [msg for (msg, time) in zip(self.cache_msgs, self.cache_times)
                  if time <= stamp]
         if not older:
             return None
         return older[-1]
 
-    def getLatestTime(self):
-        """Return the newest recorded timestamp."""
+    def getLatestTime(self) -> Optional[Time]:
+        """
+        Return the newest recorded timestamp.
+
+        :return: The timestamp of the most recently added message, or None if the cache is empty.
+        :rtype: Optional[Time]
+        """
         if not self.cache_times:
             return None
         return self.cache_times[-1]
 
-    def getOldestTime(self):
-        """Return the oldest recorded timestamp."""
+    def getOldestTime(self) -> Optional[Time]:
+        """
+        Return the oldest recorded timestamp.
+
+        :return: The timestamp of the oldest message still in the cache, or None if the cache is empty.
+        :rtype: Optional[Time]
+        """
         if not self.cache_times:
             return None
         return self.cache_times[0]
 
-    def getLast(self):
+    def getLast(self) -> Optional[MsgT]:
+        """
+        Return the newest message in the cache.
+
+        :return: The most recently recorded message object, or None if the cache is empty.
+        :rtype: Optional[MsgT]
+        """
         if self.getLatestTime() is None:
             return None
         return self.getElemAfterTime(self.getLatestTime())
